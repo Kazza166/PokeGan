@@ -1,3 +1,4 @@
+# imports
 import os
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
@@ -14,21 +15,28 @@ import torch.nn.functional as F
 import cv2
 import os
 
+# change to the path of your dataset the images must be .png .jpg or .jpeg and stored in a folder like so: dataset/images
 DATA_DIR ='I:\PKGAN\dataset'
 print(os.listdir(DATA_DIR))
 
+# Input image size of 64
 image_size = 64
+# batch size of images to train on
 batch_size = 128
+# normalising pixel values to std and mean of .5 for each channel(RGB)
 stats = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 
+# crop and resize images to image size above
 train_ds = ImageFolder(DATA_DIR, transform=T.Compose([
     T.Resize(image_size),
     T.CenterCrop(image_size),
     T.ToTensor(),
     T.Normalize(*stats)]))
 
+
 train_dl = DataLoader(train_ds, batch_size, shuffle=True)
 
+# helper functions to denormalise image tensors & display a sample of images from the training batch
 def denorm(img_tensors):
     return img_tensors * stats[1][0] + stats[0][0]
 
@@ -45,6 +53,7 @@ def show_batch(dl, nmax=64):
 show_batch(train_dl)
 plt.show()
 
+# helper functions to load model and data to GPU if available else run on CPU
 def get_default_device():
     """Pick GPU if available, else CPU"""
     if torch.cuda.is_available():
@@ -58,6 +67,7 @@ def to_device(data, device):
         return [to_device(x, device) for x in data]
     return data.to(device, non_blocking=True)
 
+# Training dataloader transfers batches of data to GPU
 class DeviceDataLoader():
     """Wrap a dataloader to move data to a device"""
     def __init__(self, dl, device):
@@ -78,29 +88,30 @@ device
 
 train_dl = DeviceDataLoader(train_dl, device)
 
+# Discriminator Architecture
 discriminator = nn.Sequential(
+   
     # in: 3 x 64 x 64
-
     nn.Conv2d(3, 64, kernel_size=4, stride=2, padding=1, bias=False),
     nn.BatchNorm2d(64),
     nn.LeakyReLU(0.2, inplace=True),
     # out: 64 x 32 x 32
-
+   
     nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=False),
     nn.BatchNorm2d(128),
     nn.LeakyReLU(0.2, inplace=True),
     # out: 128 x 16 x 16
-
+    
     nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1, bias=False),
     nn.BatchNorm2d(256),
-    nn.LeakyReLU(0.2, inplace=True),
+    nn.LeakyReLU(0.2, inplace=True),  
     # out: 256 x 8 x 8
-
+    
     nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1, bias=False),
     nn.BatchNorm2d(512),
     nn.LeakyReLU(0.2, inplace=True),
     # out: 512 x 4 x 4
-
+   
     nn.Conv2d(512, 1, kernel_size=4, stride=1, padding=0, bias=False),
     # out: 1 x 1 x 1
 
@@ -202,6 +213,7 @@ def save_samples(index, latent_tensors, show=True):
         ax.set_xticks([]); ax.set_yticks([])
         ax.imshow(make_grid(fake_images.cpu().detach(), nrow=8).permute(1, 2, 0))
 
+# Create directory to store generated images
 sample_dir = 'generated'
 os.makedirs(sample_dir, exist_ok=True)
 
@@ -244,9 +256,11 @@ def fit(epochs, lr, start_idx=1):
     
     return losses_g, losses_d, real_scores, fake_scores
 
+# Learning rate and number of training 
 lr = 0.0002
 epochs = 150
 
+# Trains model
 history = fit(epochs, lr)
 
 # Save the model checkpoints 
